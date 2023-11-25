@@ -592,6 +592,21 @@ module Isupipe
           raise HttpError.new(404, 'livecomment not found')
         end
 
+        # スパム判定
+        tx.xquery('SELECT word FROM ng_words WHERE user_id = ? AND livestream_id = ?', livestream_model.fetch(:user_id), livestream_model.fetch(:id)).each do |ng_word|
+          check = livecomment_model.fetch(:comment).include?(ng_word.fetch(:word))
+          unless check
+            raise HttpError.new(400, 'このコメントはスパムではありません')
+          end
+        end
+
+        livecomment_model = tx.xquery('SELECT * FROM livecomments WHERE id = ? LIMIT 1', livecomment_id).first
+        unless livecomment_model
+          raise HttpError.new(404, 'livecomment not found')
+        end
+
+        livecomment_model.fetch(:comment).include?(ng_word.fetch(:word))
+
         now = Time.now.to_i
         tx.xquery('INSERT INTO livecomment_reports(user_id, livestream_id, livecomment_id, created_at) VALUES (?, ?, ?, ?)', user_id, livestream_id, livecomment_id, now)
         report_id = tx.last_id
