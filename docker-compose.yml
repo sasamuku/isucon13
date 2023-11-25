@@ -10,6 +10,8 @@ services:
       - db
     tty: true
     stdin_open: true
+    environment:
+      ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS: hoge
   db:
     build: ./sql
     command: mysqld --character-set-server=utf8 --collation-server=utf8_unicode_ci
@@ -20,7 +22,5 @@ services:
       TZ: "Asia/Tokyo"
     ports:
       - "3306:3306"
-    environment:
-      - ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS=hoge
 volumes:
   db-volume:
