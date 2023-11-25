@@ -9,6 +9,7 @@ require 'open3'
 require 'securerandom'
 require 'sinatra/base'
 require 'sinatra/json'
+require 'newrelic_rpm'
 
 module Isupipe
   class App < Sinatra::Base
