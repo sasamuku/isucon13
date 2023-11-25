@@ -600,13 +600,6 @@ module Isupipe
           end
         end
 
-        livecomment_model = tx.xquery('SELECT * FROM livecomments WHERE id = ? LIMIT 1', livecomment_id).first
-        unless livecomment_model
-          raise HttpError.new(404, 'livecomment not found')
-        end
-
-        livecomment_model.fetch(:comment).include?(ng_word.fetch(:word))
-
         now = Time.now.to_i
         tx.xquery('INSERT INTO livecomment_reports(user_id, livestream_id, livecomment_id, created_at) VALUES (?, ?, ?, ?)', user_id, livestream_id, livecomment_id, now)
         report_id = tx.last_id
