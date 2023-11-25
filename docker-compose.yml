@@ -20,5 +20,7 @@ services:
       TZ: "Asia/Tokyo"
     ports:
       - "3306:3306"
+    environment:
+      - ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS=hoge
 volumes:
   db-volume:
