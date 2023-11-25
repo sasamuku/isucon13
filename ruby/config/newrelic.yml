@@ -28,6 +28,9 @@ common: &default_settings
     enabled: true
     explain_enabled: true
 
+  application_logging:
+    enabled: true
+
   # Logging level for log/newrelic_agent.log
   log_level: info
 
