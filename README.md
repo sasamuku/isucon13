@@ -6,6 +6,7 @@
 mysql -u root -p
 source /app/initdb.d/00_create_database.sql
 source /app/initdb.d/10_schema.sql
+exit
 yum install dos2unix
 dos2unix /app/init.sh
 bash /app/init.sh
