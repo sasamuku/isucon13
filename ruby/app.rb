@@ -207,9 +207,7 @@ module Isupipe
 
     # top
     get '/api/tag' do
-      tag_models = db_transaction do |tx|
-        tx.query('SELECT * FROM tags')
-      end
+      tag_models = db_conn('SELECT * FROM tags')
 
       json(
         tags: tag_models.map { |tag_model|
@@ -355,11 +353,9 @@ module Isupipe
         raise HttpError.new(401)
       end
 
-      livestreams = db_transaction do |tx|
-        tx.xquery('SELECT * FROM livestreams WHERE user_id = ?', user_id).map do |livestream_model|
+      livestreams = db_conn.query('SELECT * FROM livestreams WHERE user_id = ?', user_id).map do |livestream_model|
           fill_livestream_response(tx, livestream_model)
-        end
-      end
+			end
 
       json(livestreams)
     end
@@ -506,9 +502,7 @@ module Isupipe
 
       livestream_id = cast_as_integer(params[:livestream_id])
 
-      ng_words = db_transaction do |tx|
-        tx.xquery('SELECT * FROM ng_words WHERE user_id = ? AND livestream_id = ? ORDER BY created_at DESC', user_id, livestream_id).to_a
-      end
+      ng_words = db_conn('SELECT * FROM ng_words WHERE user_id = ? AND livestream_id = ? ORDER BY created_at DESC', user_id, livestream_id).to_a
 
       json(ng_words)
     end
@@ -678,15 +672,14 @@ module Isupipe
 
       livestream_id = cast_as_integer(params[:livestream_id])
 
-      reactions = db_transaction do |tx|
-        query = 'SELECT * FROM reactions WHERE livestream_id = ? ORDER BY created_at DESC'
-        limit_str = params[:limit] || ''
-        if limit_str != ''
-          limit = cast_as_integer(limit_str)
-          query = "#{query} LIMIT #{limit}"
-        end
+			query = 'SELECT * FROM reactions WHERE livestream_id = ? ORDER BY created_at DESC'
+			limit_str = params[:limit] || ''
+			if limit_str != ''
+				limit = cast_as_integer(limit_str)
+				query = "#{query} LIMIT #{limit}"
+			end
 
-        tx.xquery(query, livestream_id).map do |reaction_model|
+      reactions = db_conn(query, livestream_id).map do |reaction_model|
           fill_reaction_response(tx, reaction_model)
         end
       end
@@ -854,14 +847,12 @@ module Isupipe
     post '/api/login' do
       req = decode_request_body(LoginRequest)
 
-      user_model = db_transaction do |tx|
-        # usernameはUNIQUEなので、whereで一意に特定できる
-        tx.xquery('SELECT * FROM users WHERE name = ? LIMIT 1', req.username).first.tap do |user_model|
-          unless user_model
-            raise HttpError.new(401, 'invalid username or password')
-          end
-        end
-      end
+      user_model = # usernameはUNIQUEなので、whereで一意に特定できる
+									db_conn('SELECT * FROM users WHERE name = ? LIMIT 1', req.username).first.tap do |user_model|
+										unless user_model
+											raise HttpError.new(401, 'invalid username or password')
+										end
+									end
 
       unless BCrypt::Password.new(user_model.fetch(:password)).is_password?(req.password)
         raise HttpError.new(401, 'invalid username or password')
@@ -1040,9 +1031,7 @@ module Isupipe
     end
 
     get '/api/payment' do
-      total_tip = db_transaction do |tx|
-        tx.xquery('SELECT IFNULL(SUM(tip), 0) FROM livecomments', as: :array).first[0]
-      end
+      total_tip = db_conn('SELECT IFNULL(SUM(tip), 0) FROM livecomments', as: :array).first[0]
 
       json(total_tip:)
     end
