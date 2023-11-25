@@ -110,11 +110,11 @@ module Isupipe
       end
 
       def fill_livestream_response(tx, livestream_model)
-        owner_model = tx.xquery('SELECT * FROM users WHERE id = ?', livestream_model.fetch(:user_id)).first
+        owner_model = tx.xquery('SELECT * FROM users WHERE id = ? LIMIT 1', livestream_model.fetch(:user_id)).first
         owner = fill_user_response(tx, owner_model)
 
         tags = tx.xquery('SELECT * FROM livestream_tags WHERE livestream_id = ?', livestream_model.fetch(:id)).map do |livestream_tag_model|
-          tag_model = tx.xquery('SELECT * FROM tags WHERE id = ?', livestream_tag_model.fetch(:tag_id)).first
+          tag_model = tx.xquery('SELECT * FROM tags WHERE id = ? LIMIT 1', livestream_tag_model.fetch(:tag_id)).first
           {
             id: tag_model.fetch(:id),
             name: tag_model.fetch(:name),
@@ -128,10 +128,10 @@ module Isupipe
       end
 
       def fill_livecomment_response(tx, livecomment_model)
-        comment_owner_model = tx.xquery('SELECT * FROM users WHERE id = ?', livecomment_model.fetch(:user_id)).first
+        comment_owner_model = tx.xquery('SELECT * FROM users WHERE id = ? LIMIT 1', livecomment_model.fetch(:user_id)).first
         comment_owner = fill_user_response(tx, comment_owner_model)
 
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livecomment_model.fetch(:livestream_id)).first
+        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ? LIMIT 1', livecomment_model.fetch(:livestream_id)).first
         livestream = fill_livestream_response(tx, livestream_model)
 
         livecomment_model.slice(:id, :comment, :tip, :created_at).merge(
@@ -141,10 +141,10 @@ module Isupipe
       end
 
       def fill_livecomment_report_response(tx, report_model)
-        reporter_model = tx.xquery('SELECT * FROM users WHERE id = ?', report_model.fetch(:user_id)).first
+        reporter_model = tx.xquery('SELECT * FROM users WHERE id = ? LIMIT 1', report_model.fetch(:user_id)).first
         reporter = fill_user_response(tx, reporter_model)
 
-        livecomment_model = tx.xquery('SELECT * FROM livecomments WHERE id = ?', report_model.fetch(:livecomment_id)).first
+        livecomment_model = tx.xquery('SELECT * FROM livecomments WHERE id = ? LIMIT 1', report_model.fetch(:livecomment_id)).first
         livecomment = fill_livecomment_response(tx, livecomment_model)
 
         report_model.slice(:id, :created_at).merge(
@@ -154,10 +154,10 @@ module Isupipe
       end
 
       def fill_reaction_response(tx, reaction_model)
-        user_model = tx.xquery('SELECT * FROM users WHERE id = ?', reaction_model.fetch(:user_id)).first
+        user_model = tx.xquery('SELECT * FROM users WHERE id = ? LIMIT 1', reaction_model.fetch(:user_id)).first
         user = fill_user_response(tx, user_model)
 
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', reaction_model.fetch(:livestream_id)).first
+        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ? LIMIT 1', reaction_model.fetch(:livestream_id)).first
         livestream = fill_livestream_response(tx, livestream_model)
 
         reaction_model.slice(:id, :emoji_name, :created_at).merge(
@@ -167,9 +167,9 @@ module Isupipe
       end
 
       def fill_user_response(tx, user_model)
-        theme_model = tx.xquery('SELECT * FROM themes WHERE user_id = ?', user_model.fetch(:id)).first
+        theme_model = tx.xquery('SELECT * FROM themes WHERE user_id = ? LIMIT 1', user_model.fetch(:id)).first
 
-        icon_model = tx.xquery('SELECT image FROM icons WHERE user_id = ?', user_model.fetch(:id)).first
+        icon_model = tx.xquery('SELECT image FROM icons WHERE user_id = ? LIMIT 1', user_model.fetch(:id)).first
         image =
           if icon_model
             icon_model.fetch(:image)
@@ -207,7 +207,9 @@ module Isupipe
 
     # top
     get '/api/tag' do
-      tag_models = db_conn.query('SELECT * FROM tags')
+      tag_models = db_transaction do |tx|
+        tx.query('SELECT * FROM tags')
+      end
 
       json(
         tags: tag_models.map { |tag_model|
@@ -226,11 +228,11 @@ module Isupipe
       username = params[:username]
 
       theme_model = db_transaction do |tx|
-        user_model = tx.xquery('SELECT id FROM users WHERE name = ?', username).first
+        user_model = tx.xquery('SELECT id FROM users WHERE name = ? LIMIT 1', username).first
         unless user_model
           raise HttpError.new(404)
         end
-        tx.xquery('SELECT * FROM themes WHERE user_id = ?', user_model.fetch(:id)).first
+        tx.xquery('SELECT * FROM themes WHERE user_id = ? LIMIT 1', user_model.fetch(:id)).first
       end
 
       json(
@@ -278,7 +280,7 @@ module Isupipe
         # 予約枠をみて、予約が可能か調べる
         # NOTE: 並列な予約のoverbooking防止にFOR UPDATEが必要
         tx.xquery('SELECT * FROM reservation_slots WHERE start_at >= ? AND end_at <= ? FOR UPDATE', req.start_at, req.end_at).each do |slot|
-          count = tx.xquery('SELECT slot FROM reservation_slots WHERE start_at = ? AND end_at = ?', slot.fetch(:start_at), slot.fetch(:end_at)).first.fetch(:slot)
+          count = tx.xquery('SELECT slot FROM reservation_slots WHERE start_at = ? AND end_at = ? LIMIT 1', slot.fetch(:start_at), slot.fetch(:end_at)).first.fetch(:slot)
 
           if count < 1
             raise HttpError.new(400, "予約期間 #{term_start_at.to_i} ~ #{term_end_at.to_i}に対して、予約区間 #{req.start_at} ~ #{req.end_at}が予約できません")
@@ -320,7 +322,7 @@ module Isupipe
             # タグによる取得
             tag_id_list = tx.xquery('SELECT id FROM tags WHERE name = ?', key_tag_name, as: :array).map(&:first)
             tx.xquery('SELECT * FROM livestream_tags WHERE tag_id IN (?) ORDER BY livestream_id DESC', tag_id_list).map do |key_tagged_livestream|
-              tx.xquery('SELECT * FROM livestreams WHERE id = ?', key_tagged_livestream.fetch(:livestream_id)).first
+              tx.xquery('SELECT * FROM livestreams WHERE id = ?  LIMIT 1', key_tagged_livestream.fetch(:livestream_id)).first
             end
           else
             # 検索条件なし
@@ -367,7 +369,7 @@ module Isupipe
       username = params[:username]
 
       livestreams = db_transaction do |tx|
-        user = tx.xquery('SELECT * FROM users WHERE name = ?', username).first
+        user = tx.xquery('SELECT * FROM users WHERE name = ? LIMIT 1', username).first
         unless user
           raise HttpError.new(404, 'user not found')
         end
@@ -430,7 +432,7 @@ module Isupipe
       livestream_id = cast_as_integer(params[:livestream_id])
 
       livestream = db_transaction do |tx|
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
+        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ? LIMIT 1', livestream_id).first
         unless livestream_model
           raise HttpError.new(404)
         end
@@ -457,7 +459,7 @@ module Isupipe
       livestream_id = cast_as_integer(params[:livestream_id])
 
       reports = db_transaction do |tx|
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
+        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ? LIMIT 1', livestream_id).first
         if livestream_model.fetch(:user_id) != user_id
           raise HttpError.new(403, "can't get other streamer's livecomment reports")
         end
@@ -533,7 +535,7 @@ module Isupipe
       req = decode_request_body(PostLivecommentRequest)
 
       livecomment = db_transaction do |tx|
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
+        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ? LIMIT 1', livestream_id).first
         unless livestream_model
           raise HttpError.new(404, 'livestream not found')
         end
@@ -589,12 +591,12 @@ module Isupipe
       livecomment_id = cast_as_integer(params[:livecomment_id])
 
       report = db_transaction do |tx|
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
+        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ? LIMIT 1', livestream_id).first
         unless livestream_model
           raise HttpError.new(404, 'livestream not found')
         end
 
-        livecomment_model = tx.xquery('SELECT * FROM livecomments WHERE id = ?', livecomment_id).first
+        livecomment_model = tx.xquery('SELECT * FROM livecomments WHERE id = ? LIMIT 1', livecomment_id).first
         unless livecomment_model
           raise HttpError.new(404, 'livecomment not found')
         end
@@ -791,7 +793,7 @@ module Isupipe
       end
 
       user = db_transaction do |tx|
-        user_model = tx.xquery('SELECT * FROM users WHERE id = ?', user_id).first
+        user_model = tx.xquery('SELECT * FROM users WHERE id = ? LIMIT 1', user_id).first
         unless user_model
           raise HttpError.new(404)
         end
@@ -854,7 +856,7 @@ module Isupipe
 
       user_model = db_transaction do |tx|
         # usernameはUNIQUEなので、whereで一意に特定できる
-        tx.xquery('SELECT * FROM users WHERE name = ?', req.username).first.tap do |user_model|
+        tx.xquery('SELECT * FROM users WHERE name = ? LIMIT 1', req.username).first.tap do |user_model|
           unless user_model
             raise HttpError.new(401, 'invalid username or password')
           end
@@ -884,7 +886,7 @@ module Isupipe
       username = params[:username]
 
       user = db_transaction do |tx|
-        user_model = tx.xquery('SELECT * FROM users WHERE name = ?', username).first
+        user_model = tx.xquery('SELECT * FROM users WHERE name = ? LIMIT 1', username).first
         unless user_model
           raise HttpError.new(404)
         end
@@ -906,7 +908,7 @@ module Isupipe
       # また、現在の合計視聴者数もだす
 
       stats = db_transaction do |tx|
-        user = tx.xquery('SELECT * FROM users WHERE name = ?', username).first
+        user = tx.xquery('SELECT * FROM users WHERE name = ? LIMIT 1', username).first
         unless user
           raise HttpError.new(400)
         end
