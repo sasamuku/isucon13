@@ -18,7 +18,7 @@ module Isupipe
                                mode: :cpu,
                                interval: 1000,
                                save_every: 5
-    enable :logging
+    disable :logging
     set :show_exceptions, :after_handler
     set :sessions, domain: 'u.isucon.dev', path: '/', expire_after: 1000*60
     set :session_secret, ENV.fetch('ISUCON13_SESSION_SECRETKEY', 'isucon13_session_cookiestore_defaultsecret').unpack('H*')[0]
@@ -195,7 +195,7 @@ module Isupipe
     post '/api/initialize' do
       out, status = Open3.capture2e('../sql/init.sh')
       unless status.success?
-        logger.warn("init.sh failed with out=#{out}")
+
         halt 500
       end
 
@@ -280,7 +280,7 @@ module Isupipe
         # NOTE: 並列な予約のoverbooking防止にFOR UPDATEが必要
         tx.xquery('SELECT * FROM reservation_slots WHERE start_at >= ? AND end_at <= ? FOR UPDATE', req.start_at, req.end_at).each do |slot|
           count = tx.xquery('SELECT slot FROM reservation_slots WHERE start_at = ? AND end_at = ?', slot.fetch(:start_at), slot.fetch(:end_at)).first.fetch(:slot)
-          logger.info("#{slot.fetch(:start_at)} ~ #{slot.fetch(:end_at)}予約枠の残数 = #{slot.fetch(:slot)}")
+
           if count < 1
             raise HttpError.new(400, "予約期間 #{term_start_at.to_i} ~ #{term_end_at.to_i}に対して、予約区間 #{req.start_at} ~ #{req.end_at}が予約できません")
           end
@@ -550,7 +550,7 @@ module Isupipe
             ON texts.text LIKE patterns.pattern
           SQL
           hit_spam = tx.xquery(query, req.comment, ng_word.fetch(:word), as: :array).first[0]
-          logger.info("[hit_spam=#{hit_spam}] comment = #{req.comment}")
+
           if hit_spam >= 1
             raise HttpError.new(400, 'このコメントがスパム判定されました')
           end
