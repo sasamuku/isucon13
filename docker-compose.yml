@@ -2,8 +2,6 @@ version: "3"
 services:
   ruby:
     build: ./ruby
-    volumes:
-      - ./ruby:/home/isucon/webapp/ruby
     ports:
       - "8080:8080"
     depends_on:
@@ -11,7 +9,7 @@ services:
     tty: true
     stdin_open: true
     environment:
-      ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS: hoge
+      - ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS=hoge
   db:
     build: ./sql
     command: mysqld --character-set-server=utf8 --collation-server=utf8_unicode_ci
